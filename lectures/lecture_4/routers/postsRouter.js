@@ -1,7 +1,6 @@
 const express = require("express");
-const joi = require("joi");
+
 const Joi = require("joi");
-const { valid } = require("joi");
 const router = express.Router();
 let posts = [
   { id: "1", topic: "test-1", text: "topic text-1" },
@@ -21,7 +20,7 @@ router.get("/:id", (req, res) => {
 router.post("/", (req, res) => {
   const { topic, text } = req.body;
 
-  const shema = joi.object({
+  const shema = Joi.object({
     topic: Joi.string().alphanum().min(3).max(30).required(),
     text: Joi.string().alphanum().min(5).max(300).required(),
   });
@@ -30,6 +29,13 @@ router.post("/", (req, res) => {
   if (validationResult.error) {
     return res.status(400).json({ message: validationResult.error.details });
   }
+
+  // const newPost = {
+  //   id: new Date().getTime().toString(),
+  //   topic,
+  //   text,
+  // };
+
   posts.push({
     id: new Date().getTime().toString(),
     topic,
@@ -40,6 +46,15 @@ router.post("/", (req, res) => {
 
 router.put("/:id", (req, res) => {
   const { topic, text } = req.body;
+  const shema = Joi.object({
+    topic: Joi.string().alphanum().min(3).max(30).required(),
+    text: Joi.string().alphanum().min(5).max(300).required(),
+  });
+
+  const validationResult = shema.validate(req.body);
+  if (validationResult.error) {
+    return res.status(400).json({ message: validationResult.error.details });
+  }
 
   posts.forEach((post) => {
     if (post.id === req.params.id) {

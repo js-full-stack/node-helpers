@@ -2,19 +2,6 @@
 
 - [Lecture-1](#lecture-1)
 
-- [Process](#process)
-
-  - [Path](#path)
-  - [fs - модуль для работы с файлами](#fs---модуль-для-работы-с-файлами)
-
-- [Lecture-1](#lecture-1)
-
-  - [Process](#process)
-  - [Path](#path)
-  - [fs - модуль для работы с файлами](#fs---модуль-для-работы-с-файлами)
-
-- [Lecture-1](#lecture-1)
-
   - [Process](#process)
   - [Path](#path)
   - [fs - модуль для работы с файлами](#fs---модуль-для-работы-с-файлами)
