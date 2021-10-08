@@ -36,7 +36,7 @@ app.get("/home", (req, res) => {
   res.send("get request");
 });
 
-// * external middleware morgan for logging request
+// * миддлвар Morgan для логирования
 app.use(morgan("tiny"));
 // * Post
 
@@ -81,5 +81,3 @@ app.listen(PORT, (err) => {
   }
   console.log(`server works at port ${PORT}`);
 });
-
-// *redirect

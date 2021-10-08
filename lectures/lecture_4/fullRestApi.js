@@ -6,7 +6,6 @@ const PORT = process.env.PORT || 8080;
 const { postsRouter } = require("./routers/postsRouter");
 
 app.use(express.json());
-app.use(morgan("tiny"));
 require("dotenv").config();
 
 app.use("/api/posts", postsRouter);
