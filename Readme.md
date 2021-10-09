@@ -39,6 +39,7 @@
 - [Подключение к БД в приложении](#Подключение-к-БД-в-приложении)
 - [Практика](#Практика)
 - [Написание контроллеров](#Написание-контроллеров)
+- [Обработка ошибок в контроллерах](#Обработка-ошибок-в-контроллерах)
 
 # Lecture-1
 
@@ -645,6 +646,7 @@ app.use(morgan("combined")); //* вызов мидлвар для логиров
 - [connection.js](./lectures/letcure_5_db/RestFulDb/connection.js) для подключения к БД
 - [controllers.js](./lectures/letcure_5_db/RestFulDb/controllers.js) - для обработки логики запросов
 - [routers.js](./lectures/letcure_5_db/RestFulDb/routers.js) - для создания маршрутов на **GET**, **POST** и др. запросы.
+- [middlwareModels.js](./lectures/letcure_5_db/RestFulDb/middlewareModels.js) - для получения коллекции из БД во внешнем коде
 
 Функция подключения к БД вызывается в [IIFE](https://developer.mozilla.org/ru/docs/Glossary/IIFE) перед созданием сервера:
 
@@ -661,4 +663,114 @@ app.use(morgan("combined")); //* вызов мидлвар для логиров
 
 ### Написание контроллеров
 
-После записи коллекции через миддлвар она доступна во всем приложении. Поэтому в [controllers.js](./lectures/letcure_5_db/RestFulDb/controllers.js) можно приступить к написанию операций.
+После записи коллекции через миддлвар она доступна во всем приложении на req.db.Posts Поэтому в [controllers.js](./lectures/letcure_5_db/RestFulDb/controllers.js) можно приступить к написанию операций.
+
+1. Получение всех постов:
+
+```
+const fetchPosts = async (req, res) => {
+  const posts = await req.db.Posts.find({}).toArray();
+  res.json({ posts, status: "success" });
+};
+```
+
+2. Получение одного поста по id:
+
+```
+// ObjectId понадобится, чтобы преобразовать строку к объекту _id MongoDB
+const { ObjectId } = require("mongodb");
+
+const getPostById = async (req, res) => {
+  const post = await req.db.Posts.findOne({ _id: new ObjectId(req.params.id) });
+  if (!post) {
+    return res.status(400).json({
+      status: `failure, no posts with id ${id} found`,
+    });
+  }
+  res.json({ post, status: "success" });
+};
+
+
+```
+
+3. Добавление поста:
+
+```
+const addPost = async (req, res) => {
+  const { topic, text } = req.body;
+  await req.db.Posts.insertOne({ topic, text });
+
+  res.json({ status: "success" });
+};
+```
+
+4. Обновление поста:
+
+```
+const patchPost = async (req, res) => {
+  await Posts.updateOne(
+    { _id: new ObjectId(req.params.id) },
+    { $set: { topic, text } }
+  );
+  res.json({ status: "success" });
+};
+
+```
+
+5. Удаление поста:
+
+```
+const deletePost = async (req, res) => {
+  await req.db.Posts.deleteOne({ _id: new ObjectId(req.params.id) });
+
+  res.json({ status: "success" });
+};
+
+```
+
+### Обработка ошибок в контроллерах
+
+Выше прописаны CRUD операции, но в них не обрабатываются ошибки. Можно прописать try/catch для каждого контроллера, но чтобы не дублировать код, лучше написать миддлвар, который будет заниматься отловом ошибок. Для этого в server.js понадобится формат экспрессовского миддлвара с 4-мя параметрами:
+
+```
+app.use((error, req, res, next) => {
+  res.status(500).json({ message: error.message });
+});
+
+```
+
+Также потребуется промежуточное ПО в [routers.js](./lectures/letcure_5_db/RestFulDb/routers.js). Т.к. это ПО не относится к маршрутизации, ее стоит вынести в отдельный файл. Например, [asyncWrapper.js](./lectures/letcure_5_db/RestFulDb/asyncWrapper.js)
+
+```
+const asyncWrapper = (controller) => {  // принимает контроллер
+   return (req, res, next) => { // возвращает миддлвар, где контроллер принимает req и res
+    controller(req, res).catch(next); // в случае ошибки catch отлавливает ее и передает в обработчик ошибок в server.js
+  };
+};
+module.exports = { asyncWrapper };
+
+```
+
+Теперь в [routers.js](./lectures/letcure_5_db/RestFulDb/routers.js) можно обернуть все контроллеры в `asyncWrapper`, и можно не писать `try/catch` для контроллеров:
+
+```
+const { asyncWrapper } = require("./asyncWrapper");
+
+router.get("/", asyncWrapper(fetchPosts));
+router.get("/:id", asyncWrapper(getPostById));
+router.post("/", asyncWrapper(addPostValidation), addPost);
+router.patch("/:id", asyncWrapper(patchPost));
+router.delete("/:id", asyncWrapper(deletePost));
+```
+
+### Из конспекта
+
+```
+В MongoDB в запросах можно использовать условные конструкции с помощью операторов сравнения:
+
+$eq (равно)
+$gt (больше чем)
+$lt (меньше чем)
+$gte (больше или равно)
+$lte (меньше или равно)
+```

@@ -1,46 +1,42 @@
-const fetchPosts = async (req, res) => {
-  console.log(req.db);
-  // const { connectMongo } = require("./connection");
-  // const Posts = await connectMongo();
-  // const posts = await Posts.find({}).toArray();
+const { ObjectId } = require("mongodb"); //* ObjectId используется для правильной обработки id со стороны MongoDB
 
-  // res.json({ posts, status: "success" });
+const fetchPosts = async (req, res) => {
+  const posts = await req.db.Posts.find({}).toArray(); //* нужно преобразовать к массиву, т.к find вернет курсор
+  res.json({ posts, status: "success" });
 };
 
-// const getPostsById = (req, res) => {
-//   const post = posts.filter((item) => item.id === req.params.id);
-//   res.json({ post, status: "success" });
-// };
+const getPostById = async (req, res) => {
+  const post = await req.db.Posts.findOne({ _id: new ObjectId(req.params.id) });
+  res.json({ post, status: "success" });
+};
 
-// const addPost = (req, res) => {
-//   const { topic, text } = req.body;
+const addPost = async (req, res) => {
+  const { topic, text } = req.body;
+  await req.db.Posts.insertOne({ topic, text });
 
-//   posts.push({
-//     id: new Date().getTime().toString(),
-//     topic,
-//     text,
-//   });
-//   res.json({ status: "success" });
-// };
+  res.json({ status: "success" });
+};
 
-// const putPost = (req, res) => {
-//   const { topic, text } = req.body;
+const patchPost = async (req, res) => {
+  const { topic, text } = req.body;
 
-//   posts.forEach((post) => {
-//     if (post.id === req.params.id) {
-//       post.topic = topic;
-//       post.text = text;
-//     }
-//     res.json({ status: "success" });
-//   });
-// };
+  await req.db.Posts.updateOne(
+    { _id: new ObjectId(req.params.id) },
+    { $set: { topic, text } }
+  );
+  res.json({ status: "success" });
+};
 
-// const deletePost = (req, res) => {
-//   posts.filter((item) => item.id !== req.params.id);
+const deletePost = async (req, res) => {
+  await req.db.Posts.deleteOne({ _id: new ObjectId(req.params.id) });
 
-//   res.json({ status: "success" });
-// };
+  res.json({ status: "success" });
+};
 
 module.exports = {
-  fetchPosts /* getPostsById, addPost, putPost, deletePost */,
+  fetchPosts,
+  getPostById,
+  addPost,
+  patchPost,
+  deletePost,
 };

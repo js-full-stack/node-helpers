@@ -7,10 +7,14 @@ const { router } = require("./routers");
 
 const PORT = process.env.PORT || 8080;
 
+app.use(express.json());
+
+app.use(morgan("combined"));
 app.use("/api/posts", router);
 
-app.use(express.json());
-app.use(morgan("combined"));
+app.use((error, req, res, next) => {
+  res.status(500).json({ message: error.message });
+});
 
 (async () => {
   await connectMongo();
