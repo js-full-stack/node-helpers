@@ -1,16 +1,15 @@
 const express = require("express");
-const app = express();
 const morgan = require("morgan");
 require("dotenv").config();
 const { router } = require("./routers");
-const { connectMongo } = require("./connection");
+const { connectMongo } = require("./connect");
 const PORT = process.env.PORT || 8080;
 
-app.use(express.json());
+const app = express();
 
+app.use(express.json());
 app.use(morgan("combined"));
 app.use("/api/posts", router);
-
 app.use((error, req, res, next) => {
   res.status(500).json({ message: error.message });
 });

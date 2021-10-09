@@ -2,7 +2,6 @@ const Joi = require("joi");
 
 module.exports = {
   addPostValidation: (req, res, next) => {
-    next(new Error("validation failed!"));
     const shema = Joi.object({
       topic: Joi.string().alphanum().min(3).max(30).required(),
       text: Joi.string().alphanum().min(5).max(300).required(),

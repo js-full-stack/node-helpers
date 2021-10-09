@@ -41,6 +41,10 @@
 - [Написание контроллеров](#Написание-контроллеров)
 - [Обработка ошибок в контроллерах](#Обработка-ошибок-в-контроллерах)
 
+---
+
+- [Подключение к БД через mongoose](#Подключение-к-БД-через-mongoose)
+
 # Lecture-1
 
 [Ссылка на код](./lecture_1.js)
@@ -665,7 +669,7 @@ app.use(morgan("combined")); //* вызов мидлвар для логиров
 
 После записи коллекции через миддлвар она доступна во всем приложении на req.db.Posts Поэтому в [controllers.js](./lectures/letcure_5_db/RestFulDb/controllers.js) можно приступить к написанию операций.
 
-1. Получение всех постов:
+1. **Получение всех постов:**
 
 ```
 const fetchPosts = async (req, res) => {
@@ -674,7 +678,7 @@ const fetchPosts = async (req, res) => {
 };
 ```
 
-2. Получение одного поста по id:
+2. **Получение одного поста по id:**
 
 ```
 // ObjectId понадобится, чтобы преобразовать строку к объекту _id MongoDB
@@ -693,7 +697,7 @@ const getPostById = async (req, res) => {
 
 ```
 
-3. Добавление поста:
+3. **Добавление поста:**
 
 ```
 const addPost = async (req, res) => {
@@ -704,7 +708,7 @@ const addPost = async (req, res) => {
 };
 ```
 
-4. Обновление поста:
+4. **Обновление поста:**
 
 ```
 const patchPost = async (req, res) => {
@@ -717,7 +721,7 @@ const patchPost = async (req, res) => {
 
 ```
 
-5. Удаление поста:
+5.** Удаление поста:**
 
 ```
 const deletePost = async (req, res) => {
@@ -761,6 +765,104 @@ router.get("/:id", asyncWrapper(getPostById));
 router.post("/", asyncWrapper(addPostValidation), addPost);
 router.patch("/:id", asyncWrapper(patchPost));
 router.delete("/:id", asyncWrapper(deletePost));
+```
+
+### Подключение к БД через mongoose
+
+Mongoose - это драйвер для MongoDB которые существенно упрощает сообщение с БД и управление коллекциями, а дает возможность создавать определенные схемы. Для работы нужен пакет `npm i mongoose`.
+
+Теперь изменим код для постов так, чтобы использовать ~~не нативный драйвер~~, а `mongoose`.
+
+Архитектура приложения почти такая же, как и при использовании нативного драйвера:
+
+- [server.js](./lectures/lecture_6_db_mongoose/server.js) для создания сервера через express
+- [routers.js](./lectures/letcure_5_db/RestFulDb/routers.js) - для создания маршрутов на **GET**, **POST** и др. запросы.
+- [controllers.js](./lectures/lecture_6_db_mongoose/controllers.js) - для обработки логики запросов
+- [connection.js](./lectures/) для подключения к БД
+- [middlwareModels.js](./lectures/letcure_5_db/RestFulDb/middlewareModels.js) - для получения коллекции из БД во внешнем коде
+- [connect.js](./lectures/lecture_6_db_mongoose/connect.js) - подключение к БД
+- [shema.js](./lectures/lecture_6_db_mongoose/shema.js) - описывает схему коллекции
+
+Почти все модули имеют прежнюю. Файл [middlwareModels.js](./lectures/letcure_5_db/RestFulDb/middlewareModels.js) больше не нужен. И его вызов также нужно убрать из [routers.js](./lectures/letcure_5_db/RestFulDb/routers.js)
+
+~~router.use(middlwareModels);~~
+
+Основные изменения коснулись файлов `connect.js` и `сontrollers.js`. Также добавился файл `shema.js`.
+
+1. Подключение к БД в `connect-js` стало локаничнее. Слева - нативный драйвер; справа - ODB mongoose:
+
+![ex](./img/connect_mongoose.jpg)
+
+2. После настройки подключения нужно определить схему коллекции в [shema.js](./lectures/lecture_6_db_mongoose/shema.js):
+
+```
+const mongoose = require("mongoose");
+const { Schema } = mongoose;
+
+const postsShema = new Schema({
+  topic: {
+    type: String,
+    required: true,
+  },
+  text: {
+    type: String,
+    required: true,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now(),
+    required: true,
+  },
+});
+
+// * После создания схемы ее нужно скомпилировать в модель
+const Post = mongoose.model("Post", postsShema);
+
+module.exports = { Post };
+```
+
+[Ссылка на раздел документации по составлению схем](https://mongoosejs.com/docs/guide.html)
+
+3. Теперь можно заимпортировать коллекцию в [controllers.js](./lectures/lecture_6_db_mongoose/controllers.js) и можно использовать ее для операций с коллекцией:
+
+```
+const { Post } = require("./shema");
+
+// получение всех постов
+const fetchPosts = async (req, res) => {
+  const posts = await Posts.find({}); //* преобразовывать в массив не нужно, mongoose сделает это сам
+  res.json({ posts, status: "success" });
+};
+
+// получение поста по id
+const getPostById = async (req, res) => {
+  const post = await Post.findById(req.params.id);
+  res.json({ post, status: "success" });
+};
+
+
+// добавление поста
+const addPost = async (req, res) => {
+  const { topic, text } = req.body;
+
+  await Post.create({ topic, text });
+
+  //* аналогичная запись
+  //   const post = new Post({ topic, text });
+  //     await post.save();
+  res.json({ status: "success" });
+};
+
+// обновление поста
+const patchPost = async (req, res) => {
+  const { topic, text } = req.body;
+  await Post.findByIdAndUpdate(req.params.id, { $set: { topic, text } });
+  res.json({ status: "success" });
+};
+
+// удаление поста
+
+
 ```
 
 ### Из конспекта
