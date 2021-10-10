@@ -1,4 +1,4 @@
-let posts = [
+sslet posts = [
   { id: "1", topic: "test-1", text: "topic text-1" },
   { id: "2", topic: "test-2", text: "topic text-2" },
   { id: "3", topic: "test-3", text: "topic text-3" },

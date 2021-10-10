@@ -1,41 +1,50 @@
-const { Post } = require("./shema");
+const {
+  fetchPostsService,
+  getPostByIdService,
+  addPostService,
+  patchPostService,
+  deletePostService,
+} = require("./services");
 
-const fetchPosts = async (req, res) => {
-  const posts = await Post.find({}); //* преобразовывать в массив не нужно, mongoose сделает это сам
-  res.json({ posts, status: "success" });
+const fetchPostsController = async (req, res) => {
+  const posts = await fetchPostsService();
+  res.json({ posts, message: "success" });
 };
 
-const getPostById = async (req, res) => {
-  const post = await Post.findById(req.params.id);
-  res.json({ post, status: "success" });
+const getPostByIdController = async (req, res) => {
+  const { id } = req.params;
+  const post = await getPostByIdService(id);
+  res.json({ post, message: "success" });
 };
 
-const addPost = async (req, res) => {
+const addPostController = async (req, res) => {
   const { topic, text } = req.body;
+  await addPostService({ topic, text });
 
-  await Post.create({ topic, text });
-
-  //* аналогичная запись
-  //   const post = new Post({ topic, text });
-  //     await post.save();
-  res.json({ status: "success" });
+  res.json({ message: "success" });
 };
 
-const patchPost = async (req, res) => {
+const patchPostController = async (req, res) => {
   const { topic, text } = req.body;
-  await Post.findByIdAndUpdate(req.params.id, { $set: { topic, text } });
-  res.json({ status: "success" });
+  const { id } = req.params;
+  await patchPostService(id, { topic, text });
+
+  res.json({ message: "success" });
 };
 
-const deletePost = async (req, res) => {
-  await Post.findByIdAndRemove(req.params.id);
-  res.json({ status: "success" });
+const deletePostController = async (req, res) => {
+  const { id } = req.params;
+  const post = await deletePostService(id);
+  if (!post) {
+    res.status(400).json({ message: `there is not user with id ${id}` });
+  }
+  res.json({ message: "success" });
 };
 
 module.exports = {
-  fetchPosts,
-  getPostById,
-  addPost,
-  patchPost,
-  deletePost,
+  fetchPostsController,
+  getPostByIdController,
+  addPostController,
+  patchPostController,
+  deletePostController,
 };
