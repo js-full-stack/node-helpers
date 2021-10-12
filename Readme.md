@@ -37,17 +37,38 @@
 ---
 
 - [Подключение к БД в приложении](#Подключение-к-БД-в-приложении)
-- [Практика](#Практика)
+
+  ## [Практика](#практика)
+
 - [Написание контроллеров](#Написание-контроллеров)
 - [Обработка ошибок в контроллерах](#Обработка-ошибок-в-контроллерах)
 - [Подключение к БД через mongoose](#Подключение-к-БД-через-mongoose)
 - [Сервисы для сообщения с БД](#сервисы-для-сообщения-с-бд)
+
+### Отлов ошибок
+
 - [Кастомные ошибки](#кастомные-ошибки)
 - [Цепочка отлова ошибок](#Цепочка-отлова-ошибок)
 
 ---
 
-- [Подключение к БД через mongoose](#Подключение-к-БД-через-mongoose)
+- [Аутентификация и авторизация](#аутентификация-и-авторизация)
+- [Хеширование паролей](#Хеширование-паролей)
+- [Bcrypt для адаптивного хеширования паролей](#Bcrypt-для-адаптивного-хеширования-паролей)
+
+## Практика
+
+---
+
+- [Архитектура проекта](#архитектура-проекта)
+
+- [Модель юзера](#Модель-юзера)
+- [Сервисы юзера](#Сервисы-юзера)
+- [Контроллеры юзера](#контроллеры-юзера)
+- [Роутеры юзера](#роутеры-юзера)
+
+- [Добавление логики для приватного доступа юзера к постам](#Добавление-логики-для-приватного-доступа-юзера-к-постам)
+- [Рефакторинг контроллеров постов](#Рефакторинг-контроллеров-постов)
 
 # Lecture-1
 
@@ -973,13 +994,331 @@ class CustomError extends Error {
 
 ![ex](./img/customError.jpg)
 
-\*\*\*\*### Цепочка отлова ошибок
+### Цепочка отлова ошибок
 
 Допустим, при добавлении поста по `id` в `getPostByIdService` случается ошибка. Тогда произойдет следующее:
 
 1. Сработает инструкция `throw new CustomError(400, "there is no post with entered id");` и ошибка пробросится дальше, то есть в `controllers.js`
 2. Контроллер получит ошибку и передаст ее в `routers.js`
 3. В `routers.js`сработает инструкция `router.post("/", addPostValidation, asyncWrapper(addPostController));`. Прослойка `asyncWrapper` в [apiHelpers.js](./lectures/lecture_6_db_mongoose/apiHelpers.js) перехватит управление перед вызовом `addPostController`.
-4. Далее через `next()` миддлвар `asyncWrapper` передаст ошибку в `ErrorHandler`, так как именно он вызывается как главный миддлвар для отлова ошибок в `service.js` - `app.use(errorHandler);`
+4. Далее через `next()` миддлвар `asyncWrapper` передаст ошибку в `ErrorHandler`, так как именно он вызывается как главный миддлвар для отлова ошибок в `server.js` - `app.use(errorHandler);`
 
 ---
+
+### Аутентификация и авторизация
+
+Аутентификация направлена на то, чтобы идентифицировать пользователя. Т.е. она происходит при логинизации. Авторизация же нацелена на то, чтобы определить его права. Например, права обычного юзера и админа отличаются, и за это отвечает авторизация, которая происходит после аутентификации.
+
+Есть несколько видов аутентификации:
+
+1. Basic - данные о зарегистрированном или авторизованном пользователе передаются в заголовке авторизации в формате `Authorization: Basic base64_encode(login:password)`.
+
+2. JSON Web Token (JWT) - при аутентификации подписывается токен, состоящий из заголовка (`header`), полезной нагрузки (`paylaod`), куда записываются данные, по которым можно идентифицировать юзера (чаще всего id) и подпись (`signature`)
+
+3. OAuth - для регистрации через аккаунт в google, facebook и др. популярные сервисы.
+
+### Хеширование паролей
+
+Важнейший атрибут секьюрного сервиса - защита приватных данных пользователей. Хеширование дает возможность повысить безопасность путем шифрования паролей, т.к. именно они используются для доступа к закрытым аккаунтам. Хеширование происходит таким образом:
+
+1. При регистрации пользователь вводит пароль и он отправляется на бекенд
+2. К строке пароля добавляется _соль_(`salt`), представляющая собой опрределенную строку. Добавление _соли_ гарантирует повышенную безопасность, но все еще не спасает от атак перебором.
+3. На бекенде происходит хеширование. В хеше, помимо пароля, хранится `SECRET_KEY`, поэтому расшифровать уже сложнее, но все еще не идеально.
+
+### Bcrypt для адаптивного хеширования паролей
+
+Выше описани механизм статического хеширования, но он недостаточно безопасен, т.к. не гарантирует защиту от атак перебором.
+
+Для решения этой проблемы был изобретен адаптивный алгоритм хеширования паролей - `bcrypt`. Подробнее почитать об этом механизме можно [по ссылке](https://codahale.com/how-to-safely-store-a-password/), но суть в том, что он хеширует пароль, после хеширует хеш и так указанное число раундов. Это повышает защиту _Brute force_ атак на несколько порядков.
+
+[В документации](https://www.npmjs.com/package/bcrypt) есть таблица с временем хеширования для процессора 2GHz при различном количестве раундов:
+
+![ex](./img/rounds.jpg)
+
+Установка пакета - `npm i bcrypt`. Позже он понадобится.
+
+### Архитектура проекта
+
+Для построения масштабируемого приложения важно заранее позаботиться о структуре. Это приложение будет включать цикл CRUD-операций, аутентификацию и авторизацию пользователя.
+
+Корневая папка проекта `src`. В ней находится файл [server.js](./src/server.js), который запускает сервер. Также есть такие папки:
+
+- `routes` - содержит [postRouters.js](./src/routes/postRouters.js) с маршрутами для постов и [authRouters](./src/routes/authRouters.js) с маршрутами для регистрации и логинизации.
+- `middlwares` - содержит [validationMiddlware.js](./src/middlwares/validationMiddlware.js) с миддлваром для валидации
+- `helpers` - содержит [errors.js](./src/helpers/errors.js) - фабрику для генерации кастомных ошибок, [apiHelpers.js](./src/helpers/apiHelpers.js) с обработчиками ошибок и [constants.js](./src/helpers/constants.js) с константами для кодов ошибок.
+
+- `db` - содержит [connect js](./src/db/connect.js) с подключением к БД и [shema.js](src/db/shema.js) с описанием моделей
+
+- `services` -
+- `controllers` - содержит [postControllers.js](./src/controllers/postControllers.js) и [authControllers.js](./src/controllers/authControllers.js) для обработки запросов с маршрутами для постов и авторизацией юзера соответственно.
+
+### Модель юзера
+
+Данные будут храниться в базе данных, поэтому в [shema.js](./src/db/shema.js) создается модель пользователя. Здесь же нужно позаботиться о хешировании паролей с пакетом `npm i bcrypt`, о котором [говорилось в части о хешировании паролей](#Bcrypt-для-адаптивного-хеширования-паролей)). Для этого потребуется миддлвар mongoose.
+
+```
+const mongoose = require("mongoose");
+const { Schema } = mongoose;
+const bcrypt = require("bcrypt"); //* подключение bcrypt
+
+const userShema = new Schema(
+  {
+    email: {
+      type: String,
+      minlength: 5,
+      maxlength: 20,
+      required: [true, "Name is required"],
+      unique: true,
+    },
+
+    password: {
+      type: String,
+      required: [true, "Password is required"],
+    },
+  },
+  { versionKey: false, timestamps: true }
+);
+
+//* здесь происходит хеширование паролей
+userShema.pre("save", async function () {
+
+//* если документ новый, хеширует пароль
+  if (this.isNew) {
+    this.password = await bcrypt.hash(this.password, 10);
+  }
+});
+
+const User = mongoose.model("User", userShema);
+
+module.exports = { User };
+```
+
+### Сервисы юзера
+
+Импортируем схему юзера в сервисы и пропишем логику для регистрации и логина. Также потребуется пакет `npm i jsonwebtoken` для аутентификации по токену, о чем говорилось в разделе [аутентификация и авторизация](#Аутентификация-и-авторизация)
+
+```
+const bcrypt = require("bcrypt"); //* подключает bcrypt
+const jwt = require("jsonwebtoken"); //* подключает jwt
+
+const JWT_SECRET = process.env.SECRET; //* достает секрет из .env
+const { User } = require("../db/userShema"); //* достает схему юзера
+
+const { CustomError } = require("../helpers/errors");
+
+const regService = async (email, password) => {
+  // *создает нового юзера со свойствами email и password
+  const user = new User({ email, password });
+  await user.save(); //* сохраняет юзера в БД
+};
+
+const logService = async (email, password) => {
+  const user = await User.findOne({ email });
+
+  //* если не находит юзера в БД, пробрасывает ошибку авторизации
+  if (!user) {
+    throw new CustomError(401, `user with email "${email}" not exist`);
+  }
+
+  //* если введенный и полученный из БД пароль юзера не совпадаетт - ошибка
+  //* password - пароль, который вводит юзер; user.password - пароль, который хранится на бекенде
+  if (!(await bcrypt.compare(password, user.password))) {
+    throw new CustomError(401, "wrong password");
+  }
+
+  //* если юзер найден - подписывает ему токен, записывая в payload его _id
+  const token = jwt.sign(
+    {
+      _id: user._id, //* зашивает в token _id юзера
+    },
+    JWT_SECRET, //* 2-м аргументом ф-я sign принимает ключ
+    { expiresIn: "4h" } //* здесь можно указать срок действия токена
+  );
+  return token; //* возвращает токен
+};
+
+module.exports = { regService, logService };
+
+
+```
+
+### Контроллеры юзера
+
+Контроллеры импортируют логику сервисов и формируют ответы на клиент:
+
+```
+const { regService, logService } = require("../services/authService");
+
+const regController = async (req, res) => {
+  const { email, password } = req.body;
+  await regService(email, password);
+  res.json({ message: "registration success" });
+};
+
+const logController = async (req, res) => {
+  const { email, password } = req.body;
+
+  //* сервис возвращает токен, который можно записать в переменную, вызывав функцию
+  const token = await logService(email, password);
+  res.json({ message: "login success", token }); //* возвращаем токен клиенту как paylaod
+};
+
+module.exports = { regController, logController };
+```
+
+### Роутеры юзера
+
+Логика контроллеров передается в [authRouters.js](./src/routes/authRouters.js). Нужно два маршрута: на регистрацию и на логин:
+
+```
+const express = require("express");
+const router = express.Router();
+const {
+  regController,
+  logController,
+} = require("../controllers/authControllers");
+
+const { asyncWrapper } = require("../helpers/apiHelpers");
+
+router.post("/registration", asyncWrapper(regController));
+router.post("/login", asyncWrapper(logController));
+
+module.exports = { authRouter: router };
+
+```
+
+Подробнее о том, как использовать токен для авторизации пользователя на клиенте [можно почитать в другом конспекте](https://github.com/js-full-stack/react-redux-tutorial#%D0%97%D0%B0%D0%BF%D0%B8%D1%81%D1%8C-%D1%82%D0%BE%D0%BA%D0%B5%D0%BD%D0%B0-%D0%B2-%D0%B7%D0%B0%D0%B3%D0%BE%D0%BB%D0%BE%D0%B2%D0%BE%D0%BA-%D0%B0%D0%B2%D1%82%D0%BE%D1%80%D0%B8%D0%B7%D0%B0%D1%86%D0%B8%D0%B8)
+
+![ex](./img/postman.jpg)
+
+### Добавление логики для приватного доступа юзера к постам
+
+[Ранее был пример с добавлением операций для постов](#Написание-контроллеров). Но в такой имплементации посты доступны любому пользователю, а нужно сделать так, чтобы каждый юзер получал личную коллекцию постов из БД после авторизации. Для этого потребуется переписать [сервисы](./lectures/lecture_6_db_mongoose/services.js) и [контроллеры](./lectures/lecture_6_db_mongoose/controllers.js). Но cначала нужно добавить новое поле в [postShema.js](./src/db/postShema.js). Это поле будет идентифицировать юзера при манипулации коллекцией постов:
+
+```
+    userId: {
+      type: String,
+      required: true
+    }
+```
+
+и написать миддлвар `authMiddlware.js`, с помощью которого будет происходить проверка токена:
+
+```
+const authMiddlware = (req, res, next) => {
+  //* сплитим tokenType (Bearer) и token по пустой строке, деструктуризируя из в переменные
+  const [tokenType, token] = req.headers.authorization?.split(" ");
+
+  //* если токена нет - пробрасываем ошибку авторизации
+  if (!token) {
+    next(new CustomError(401, "Please, provide a token"));
+  }
+  try {
+    //* если токен есть, декодируем его, передавая в функцию decode токен и секрет
+    const user = jwt.decode(token, process.env.SECRET); //* декодируем токен и получаем payload юзера (id)
+    req.token = token; //* записывает на request token (это необязательно)
+    req.user = user; //* записываем на request декодированные данные юзера
+    next(); //* передаем управление дальше
+  } catch (error) {
+    next(new CustomError(401, "Invalid token"));
+  }
+};
+
+module.exports = { authMiddlware };
+
+```
+
+Теперь этот миддлвар нужно применить в [postRouters.js](./src/routes/postRouters.js): `router.use(authMiddlware)`. То есть теперь на `req.user` можно получить `id` зарегистрированного юзера и использовать его для авторизации при работе с коллекцией постов.
+
+### Рефакторинг контроллеров постов
+
+Для примера без авторизации цепочка методов для получения постов выглядит так:
+
+```
+// service
+const fetchPostsService = async () => {
+  const posts = await Post.find({});
+  return posts;
+};
+
+// controller
+const fetchPostsController = async (req, res) => {
+  const posts = await fetchPostsService();
+  res.json({ posts, message: "success" });
+};
+
+```
+
+С авторизацией:
+
+```
+// service
+const fetchPostsService = async (userId) => {
+  //* находим посты пользователя поле userId которого === переданному
+  const posts = await Post.find({ userId });
+  return posts;
+};
+
+//controller
+const fetchPostsController = async (req, res) => {
+  //* достаем _id пользователя из миддлвара и переименовываем на userId
+  const { _id: userId } = req.user;
+
+  //* получаем посты юзера с переданным userId
+  const posts = await fetchPostsService(userId);
+
+  res.json({ posts, message: "success" });
+};
+```
+
+Добавление без авторизации:
+
+```
+// service
+const addPostService = async ({ topic, text }) => {
+  const post = new Post({ topic, text });
+
+//controller
+const addPostController = async (req, res) => {
+  const { _id: userId } = req.user;
+
+  const { topic, text } = req.body;
+  await addPostService({ topic, text });
+
+  res.json({ message: "success" });
+};
+
+```
+
+С авторизацией:
+
+```
+// service
+const addPostService = async ({ topic, text }, userId) => {
+  const post = new Post({ topic, text, userId });
+
+  if (!post) {
+    throw new CustomError(400, "post creation error");
+  }
+  await post.save();
+  return post;
+};
+
+
+//controller
+
+const addPostController = async (req, res) => {
+  const { _id: userId } = req.user;
+
+  const { topic, text } = req.body;
+  await addPostService({ topic, text }, userId);
+
+  res.json({ message: "success" });
+};
+
+```
+
+Полный список операций для постов с авторизацией по ссылкам:
+
+- [postService.js](./src/services/postServices.js)
+- [postControllers.js](./src/controllers/postControllers.js)
