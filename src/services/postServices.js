@@ -11,7 +11,7 @@ const fetchPostsService = async (userId) => {
 const getPostByIdService = async (postId, userId) => {
   const post = await Post.findOne({ _id: postId, userId });
   if (!post) {
-    throw new CustomError(400, `there is no post with id ${id}`);
+    throw new CustomError(400, `there is no post with id ${postId}`);
   }
   return post;
 };

@@ -8,7 +8,6 @@ const postShema = new Schema(
       minlength: 3,
       maxlength: 30,
       required: [true, "Topic is required"],
-      unique: true,
     },
     text: {
       type: String,
